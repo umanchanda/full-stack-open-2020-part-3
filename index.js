@@ -1,20 +1,16 @@
-if (process.env.NODE_ENV !== 'production') {
-  require('dotenv').config()
-}
-
 const express = require('express')
-const bodyParser = require('body-parser')
 const app = express()
-const morgan = require('morgan')
 const cors = require('cors')
 
+require('dotenv').config()
 const Person = require('./models/person')
+
+const morgan = require('morgan')
 
 app.use(cors())
 app.use(express.json())
 app.use(morgan('tiny'))
 app.use(express.static('build'))
-app.use(bodyParser.json())
 
 // morgan.token('body', (req, res) => {
 //   return req.method === "POST" ? JSON.stringify(req.body) : null
@@ -38,8 +34,8 @@ app.get('/api/persons/:id', (req, res, next) => {
       } else {
         res.status(400).end()
       }
-  })
-  .catch(err => next(err))
+    })
+    .catch(err => next(err))
 })
 
 app.post('/api/persons', (req, res, next) => {
@@ -118,7 +114,7 @@ app.get('/info', (req, res) => {
   })
 })
 
-const PORT = process.env.PORT;
+const PORT = process.env.PORT
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`)
 })

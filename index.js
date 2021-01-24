@@ -1,9 +1,12 @@
+if (process.env.NODE_ENV !== 'production') {
+  require('dotenv').config()
+}
+
 const express = require('express')
+const bodyParser = require('body-parser')
 const app = express()
 const morgan = require('morgan')
 const cors = require('cors')
-
-require('dotenv').config()
 
 const Person = require('./models/person')
 
@@ -11,6 +14,7 @@ app.use(cors())
 app.use(express.json())
 app.use(morgan('tiny'))
 app.use(express.static('build'))
+app.use(bodyParser.json())
 
 // morgan.token('body', (req, res) => {
 //   return req.method === "POST" ? JSON.stringify(req.body) : null
@@ -26,30 +30,11 @@ app.get('/api/persons', (req, res) => {
   })
 })
 
-app.post('/api/persons', (req, res) => {
-  const body = req.body
-
-  if (!body.name || !body.number) {
-    return res.status(400).json({
-      error: 'Content Missing'
-    })
-  }
-
-  const person = new Person({
-    name: body.name,
-    number: body.number
-  })
-
-  person.save().then(savedPerson => {
-    res.json(savedPerson.toJSON())
-  })
-})
-
-app.get('/api/persons/:id', (req, res) => {
+app.get('/api/persons/:id', (req, res, next) => {
   Person.findById(req.params.id)
     .then(person => {
       if (person) {
-        res.json(person)
+        res.json(person.toJSON())
       } else {
         res.status(400).end()
       }
@@ -57,7 +42,31 @@ app.get('/api/persons/:id', (req, res) => {
   .catch(err => next(err))
 })
 
-app.delete('/api/persons/:id', (req, res) => {
+app.post('/api/persons', (req, res, next) => {
+  const body = req.body
+
+  // if (!body.name || !body.number) {
+  //   return res.status(400).json({
+  //     error: 'Content Missing'
+  //   })
+  // }
+
+  const person = new Person({
+    name: body.name,
+    number: body.number
+  })
+
+  person.save()
+    .then(savedPerson => {
+      savedPerson.toJSON()
+    })
+    .catch(err => {
+      next(err)
+      console.log(`${err.response.data}`)
+    })
+})
+
+app.delete('/api/persons/:id', (req, res, next) => {
   Person.findByIdAndRemove(req.params.id)
     .then(result => {
       res.status(204).end()
@@ -65,7 +74,7 @@ app.delete('/api/persons/:id', (req, res) => {
     .catch(err => next(err))
 })
 
-app.put('/api/persons/:id', (req, res) => {
+app.put('/api/persons/:id', (req, res, next) => {
   const body = req.body
 
   const updatedPerson = {
@@ -73,24 +82,26 @@ app.put('/api/persons/:id', (req, res) => {
     number: body.number
   }
 
-  Person.findByIdAndUpdate(req.params.id, updatedPerson, { new: true })
+  Person.findByIdAndUpdate(req.params.id, updatedPerson, { new: true, runValidators: true, context: 'query' })
     .then(updated => {
       res.json(updated)
     })
     .catch(err => next(err))
 })
 
-const unknownEndpoint = (err, req, res) => {
+const unknownEndpoint = (req, res) => {
   res.status(404).send({ error: 'Unknown Endpoint' })
 }
 
 app.use(unknownEndpoint)
 
-const errorHandler = (err, req, res) => {
+const errorHandler = (err, req, res, next) => {
   console.log(err.message)
 
   if (err.name === 'CastError') {
     return res.status(400).send({ error: 'malformed id' })
+  } else if (err.name === 'ValidationError') {
+    return res.status(400).json({ error: err.message })
   }
 
   next(err)
